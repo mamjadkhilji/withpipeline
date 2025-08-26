@@ -42,17 +42,27 @@ jobs:
         name: jar-artifacts
         path: "*/target/*.jar"
     
-    - name: Notify MCP Server
+    - name: Workflow Status Notification
       if: always()
       run: |
-        curl -X POST ${{ secrets.MCP_WEBHOOK_URL || 'http://localhost:8080/webhook' }} \
-          -H "Content-Type: application/json" \
-          -H "X-GitHub-Event: workflow_run" \
-          -d '{
-            "workflow_run": {
-              "name": "${{ github.workflow }}",
-              "status": "completed",
-              "conclusion": "${{ job.status }}",
-              "html_url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-            }
-          }' || true
+        echo "🔔 WORKFLOW NOTIFICATION:"
+        echo "   Workflow: ${{ github.workflow }}"
+        echo "   Status: ${{ job.status }}"
+        echo "   URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+        
+        # Try to notify MCP server if URL is configured
+        if [ -n "${{ secrets.MCP_WEBHOOK_URL }}" ]; then
+          curl -X POST "${{ secrets.MCP_WEBHOOK_URL }}" \
+            -H "Content-Type: application/json" \
+            -H "X-GitHub-Event: workflow_run" \
+            -d '{
+              "workflow_run": {
+                "name": "${{ github.workflow }}",
+                "status": "completed",
+                "conclusion": "${{ job.status }}",
+                "html_url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+              }
+            }' || echo "Failed to notify MCP server"
+        else
+          echo "No MCP_WEBHOOK_URL configured - add as repository secret"
+        fi
