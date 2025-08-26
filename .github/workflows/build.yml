@@ -29,8 +29,11 @@ jobs:
     - name: Compile
       run: mvn compile
     
-    - name: Test
-      run: mvn test
+    - name: Test with Coverage
+      run: mvn test jacoco:report
+    
+    - name: Check Coverage
+      run: mvn jacoco:check
     
     - name: Package
       run: mvn package
