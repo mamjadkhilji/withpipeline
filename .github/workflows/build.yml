@@ -34,9 +34,25 @@ jobs:
     
     - name: Package
       run: mvn package
+      if: success()
     
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
         name: jar-artifacts
         path: "*/target/*.jar"
+    
+    - name: Notify MCP Server
+      if: always()
+      run: |
+        curl -X POST ${{ secrets.MCP_WEBHOOK_URL || 'http://localhost:8080/webhook' }} \
+          -H "Content-Type: application/json" \
+          -H "X-GitHub-Event: workflow_run" \
+          -d '{
+            "workflow_run": {
+              "name": "${{ github.workflow }}",
+              "status": "completed",
+              "conclusion": "${{ job.status }}",
+              "html_url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            }
+          }' || true
