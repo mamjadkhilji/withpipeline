@@ -1,0 +1,437 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CicdMcpServer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">cicd-mcp-server</a> &gt; <a href="index.source.html" class="el_package">com.mcp.cicd</a> &gt; <span class="el_source">CicdMcpServer.java</span></div><h1>CicdMcpServer.java</h1><pre class="source lang-java linenums">package com.mcp.cicd;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.time.Duration;
+
+public class CicdMcpServer {
+    private final HttpClient httpClient;
+    private final ObjectMapper mapper;
+    private final String githubToken;
+<span class="fc" id="L20">    private final String baseUrl = &quot;https://api.github.com&quot;;</span>
+
+<span class="fc" id="L22">    public CicdMcpServer() {</span>
+<span class="fc" id="L23">        this.httpClient = HttpClient.newBuilder()</span>
+<span class="fc" id="L24">            .connectTimeout(Duration.ofSeconds(10))</span>
+<span class="fc" id="L25">            .build();</span>
+<span class="fc" id="L26">        this.mapper = new ObjectMapper();</span>
+<span class="fc" id="L27">        this.githubToken = System.getenv(&quot;GITHUB_TOKEN&quot;);</span>
+<span class="fc" id="L28">        System.err.println(&quot;CI/CD MCP Server initialized&quot;);</span>
+<span class="fc" id="L29">    }</span>
+
+    public static void main(String[] args) {
+<span class="nc" id="L32">        new CicdMcpServer().run();</span>
+<span class="nc" id="L33">    }</span>
+
+    private void run() {
+<span class="nc" id="L36">        System.err.println(&quot;Starting MCP server main loop...&quot;);</span>
+<span class="nc" id="L37">        try (BufferedReader reader = new BufferedReader(new InputStreamReader(System.in))) {</span>
+            String line;
+<span class="nc bnc" id="L39" title="All 2 branches missed.">            while ((line = reader.readLine()) != null) {</span>
+<span class="nc" id="L40">                System.err.println(&quot;Received request: &quot; + line);</span>
+                try {
+<span class="nc" id="L42">                    JsonNode request = mapper.readTree(line);</span>
+<span class="nc" id="L43">                    JsonNode response = handleRequest(request);</span>
+                    
+                    // Only send response if it's not null (notifications don't need responses)
+<span class="nc bnc" id="L46" title="All 2 branches missed.">                    if (response != null) {</span>
+<span class="nc" id="L47">                        String responseStr = mapper.writeValueAsString(response);</span>
+<span class="nc" id="L48">                        System.err.println(&quot;Sending response: &quot; + responseStr);</span>
+<span class="nc" id="L49">                        System.out.println(responseStr);</span>
+<span class="nc" id="L50">                        System.out.flush();</span>
+                    }
+<span class="nc" id="L52">                } catch (Exception e) {</span>
+<span class="nc" id="L53">                    System.err.println(&quot;Parse error: &quot; + e.getMessage());</span>
+<span class="nc" id="L54">                    e.printStackTrace();</span>
+<span class="nc" id="L55">                    ObjectNode errorResponse = createErrorResponse(null, -32700, &quot;Parse error: &quot; + e.getMessage());</span>
+<span class="nc" id="L56">                    System.out.println(mapper.writeValueAsString(errorResponse));</span>
+<span class="nc" id="L57">                    System.out.flush();</span>
+<span class="nc" id="L58">                }</span>
+            }
+<span class="nc" id="L60">            System.err.println(&quot;Input stream closed, exiting...&quot;);</span>
+<span class="nc" id="L61">        } catch (Exception e) {</span>
+<span class="nc" id="L62">            System.err.println(&quot;Fatal error in main loop: &quot; + e.getMessage());</span>
+<span class="nc" id="L63">            e.printStackTrace();</span>
+<span class="nc" id="L64">        }</span>
+<span class="nc" id="L65">    }</span>
+
+    private JsonNode handleRequest(JsonNode request) {
+<span class="nc" id="L68">        String method = request.get(&quot;method&quot;).asText();</span>
+<span class="nc" id="L69">        JsonNode id = request.get(&quot;id&quot;);</span>
+        
+        try {
+<span class="nc bnc" id="L72" title="All 5 branches missed.">            JsonNode result = switch (method) {</span>
+<span class="nc" id="L73">                case &quot;initialize&quot; -&gt; handleInitialize();</span>
+<span class="nc" id="L74">                case &quot;initialized&quot; -&gt; handleInitialized();</span>
+<span class="nc" id="L75">                case &quot;tools/list&quot; -&gt; handleToolsList();</span>
+<span class="nc" id="L76">                case &quot;tools/call&quot; -&gt; handleToolCall(request.get(&quot;params&quot;));</span>
+<span class="nc" id="L77">                default -&gt; throw new RuntimeException(&quot;Unknown method: &quot; + method);</span>
+            };
+            
+<span class="nc bnc" id="L80" title="All 2 branches missed.">            return result != null ? createSuccessResponse(id, result) : null;</span>
+<span class="nc" id="L81">        } catch (Exception e) {</span>
+<span class="nc" id="L82">            System.err.println(&quot;Error handling request: &quot; + e.getMessage());</span>
+<span class="nc" id="L83">            return createErrorResponse(id, -32603, &quot;Internal error: &quot; + e.getMessage());</span>
+        }
+    }
+
+    private JsonNode handleInitialize() {
+<span class="nc" id="L88">        ObjectNode response = mapper.createObjectNode();</span>
+<span class="nc" id="L89">        response.put(&quot;protocolVersion&quot;, &quot;2024-11-05&quot;);</span>
+        
+<span class="nc" id="L91">        ObjectNode capabilities = mapper.createObjectNode();</span>
+<span class="nc" id="L92">        ObjectNode tools = mapper.createObjectNode();</span>
+<span class="nc" id="L93">        tools.put(&quot;listChanged&quot;, false);</span>
+<span class="nc" id="L94">        capabilities.set(&quot;tools&quot;, tools);</span>
+<span class="nc" id="L95">        response.set(&quot;capabilities&quot;, capabilities);</span>
+        
+<span class="nc" id="L97">        ObjectNode serverInfo = mapper.createObjectNode();</span>
+<span class="nc" id="L98">        serverInfo.put(&quot;name&quot;, &quot;cicd-mcp-server&quot;);</span>
+<span class="nc" id="L99">        serverInfo.put(&quot;version&quot;, &quot;1.0.0&quot;);</span>
+<span class="nc" id="L100">        response.set(&quot;serverInfo&quot;, serverInfo);</span>
+        
+<span class="nc" id="L102">        System.err.println(&quot;MCP Server initialized successfully&quot;);</span>
+<span class="nc" id="L103">        return response;</span>
+    }
+
+    private JsonNode handleInitialized() {
+        // This is a notification, no response needed
+<span class="nc" id="L108">        System.err.println(&quot;MCP Server initialization completed&quot;);</span>
+<span class="nc" id="L109">        return null;</span>
+    }
+
+    private JsonNode handleToolsList() {
+<span class="nc" id="L113">        ArrayNode tools = mapper.createArrayNode();</span>
+        
+<span class="nc" id="L115">        tools.add(createTool(&quot;health_check&quot;, &quot;Check GitHub API connectivity&quot;));</span>
+<span class="nc" id="L116">        tools.add(createTool(&quot;list_workflows&quot;, &quot;List workflows in repository&quot;,</span>
+<span class="nc" id="L117">            createParam(&quot;owner&quot;, &quot;string&quot;, &quot;Repository owner&quot;, true),</span>
+<span class="nc" id="L118">            createParam(&quot;repo&quot;, &quot;string&quot;, &quot;Repository name&quot;, true)));</span>
+<span class="nc" id="L119">        tools.add(createTool(&quot;trigger_workflow&quot;, &quot;Trigger workflow run&quot;,</span>
+<span class="nc" id="L120">            createParam(&quot;owner&quot;, &quot;string&quot;, &quot;Repository owner&quot;, true),</span>
+<span class="nc" id="L121">            createParam(&quot;repo&quot;, &quot;string&quot;, &quot;Repository name&quot;, true),</span>
+<span class="nc" id="L122">            createParam(&quot;workflow_id&quot;, &quot;string&quot;, &quot;Workflow ID or filename&quot;, true),</span>
+<span class="nc" id="L123">            createParam(&quot;ref&quot;, &quot;string&quot;, &quot;Git reference (branch/tag)&quot;, false)));</span>
+<span class="nc" id="L124">        tools.add(createTool(&quot;get_workflow_runs&quot;, &quot;Get workflow run history&quot;,</span>
+<span class="nc" id="L125">            createParam(&quot;owner&quot;, &quot;string&quot;, &quot;Repository owner&quot;, true),</span>
+<span class="nc" id="L126">            createParam(&quot;repo&quot;, &quot;string&quot;, &quot;Repository name&quot;, true),</span>
+<span class="nc" id="L127">            createParam(&quot;workflow_id&quot;, &quot;string&quot;, &quot;Workflow ID (optional)&quot;, false)));</span>
+<span class="nc" id="L128">        tools.add(createTool(&quot;get_run_status&quot;, &quot;Get specific run status&quot;,</span>
+<span class="nc" id="L129">            createParam(&quot;owner&quot;, &quot;string&quot;, &quot;Repository owner&quot;, true),</span>
+<span class="nc" id="L130">            createParam(&quot;repo&quot;, &quot;string&quot;, &quot;Repository name&quot;, true),</span>
+<span class="nc" id="L131">            createParam(&quot;run_id&quot;, &quot;string&quot;, &quot;Run ID&quot;, true)));</span>
+<span class="nc" id="L132">        tools.add(createTool(&quot;get_run_artifacts&quot;, &quot;Get run artifacts&quot;,</span>
+<span class="nc" id="L133">            createParam(&quot;owner&quot;, &quot;string&quot;, &quot;Repository owner&quot;, true),</span>
+<span class="nc" id="L134">            createParam(&quot;repo&quot;, &quot;string&quot;, &quot;Repository name&quot;, true),</span>
+<span class="nc" id="L135">            createParam(&quot;run_id&quot;, &quot;string&quot;, &quot;Run ID&quot;, true)));</span>
+<span class="nc" id="L136">        tools.add(createTool(&quot;cancel_workflow_run&quot;, &quot;Cancel workflow run&quot;,</span>
+<span class="nc" id="L137">            createParam(&quot;owner&quot;, &quot;string&quot;, &quot;Repository owner&quot;, true),</span>
+<span class="nc" id="L138">            createParam(&quot;repo&quot;, &quot;string&quot;, &quot;Repository name&quot;, true),</span>
+<span class="nc" id="L139">            createParam(&quot;run_id&quot;, &quot;string&quot;, &quot;Run ID&quot;, true)));</span>
+        
+<span class="nc" id="L141">        ObjectNode response = mapper.createObjectNode();</span>
+<span class="nc" id="L142">        response.set(&quot;tools&quot;, tools);</span>
+<span class="nc" id="L143">        return response;</span>
+    }
+
+    private JsonNode handleToolCall(JsonNode params) {
+<span class="nc" id="L147">        String name = params.get(&quot;name&quot;).asText();</span>
+<span class="nc" id="L148">        JsonNode arguments = params.get(&quot;arguments&quot;);</span>
+        
+<span class="nc bnc" id="L150" title="All 8 branches missed.">        return switch (name) {</span>
+<span class="nc" id="L151">            case &quot;health_check&quot; -&gt; healthCheck();</span>
+<span class="nc" id="L152">            case &quot;list_workflows&quot; -&gt; listWorkflows(</span>
+<span class="nc" id="L153">                arguments.get(&quot;owner&quot;).asText(),</span>
+<span class="nc" id="L154">                arguments.get(&quot;repo&quot;).asText());</span>
+<span class="nc" id="L155">            case &quot;trigger_workflow&quot; -&gt; triggerWorkflow(</span>
+<span class="nc" id="L156">                arguments.get(&quot;owner&quot;).asText(),</span>
+<span class="nc" id="L157">                arguments.get(&quot;repo&quot;).asText(),</span>
+<span class="nc" id="L158">                arguments.get(&quot;workflow_id&quot;).asText(),</span>
+<span class="nc bnc" id="L159" title="All 2 branches missed.">                arguments.has(&quot;ref&quot;) ? arguments.get(&quot;ref&quot;).asText() : &quot;main&quot;);</span>
+<span class="nc" id="L160">            case &quot;get_workflow_runs&quot; -&gt; getWorkflowRuns(</span>
+<span class="nc" id="L161">                arguments.get(&quot;owner&quot;).asText(),</span>
+<span class="nc" id="L162">                arguments.get(&quot;repo&quot;).asText(),</span>
+<span class="nc bnc" id="L163" title="All 2 branches missed.">                arguments.has(&quot;workflow_id&quot;) ? arguments.get(&quot;workflow_id&quot;).asText() : null);</span>
+<span class="nc" id="L164">            case &quot;get_run_status&quot; -&gt; getRunStatus(</span>
+<span class="nc" id="L165">                arguments.get(&quot;owner&quot;).asText(),</span>
+<span class="nc" id="L166">                arguments.get(&quot;repo&quot;).asText(),</span>
+<span class="nc" id="L167">                arguments.get(&quot;run_id&quot;).asText());</span>
+<span class="nc" id="L168">            case &quot;get_run_artifacts&quot; -&gt; getRunArtifacts(</span>
+<span class="nc" id="L169">                arguments.get(&quot;owner&quot;).asText(),</span>
+<span class="nc" id="L170">                arguments.get(&quot;repo&quot;).asText(),</span>
+<span class="nc" id="L171">                arguments.get(&quot;run_id&quot;).asText());</span>
+<span class="nc" id="L172">            case &quot;cancel_workflow_run&quot; -&gt; cancelWorkflowRun(</span>
+<span class="nc" id="L173">                arguments.get(&quot;owner&quot;).asText(),</span>
+<span class="nc" id="L174">                arguments.get(&quot;repo&quot;).asText(),</span>
+<span class="nc" id="L175">                arguments.get(&quot;run_id&quot;).asText());</span>
+<span class="nc" id="L176">            default -&gt; throw new RuntimeException(&quot;Unknown tool: &quot; + name);</span>
+        };
+    }
+
+    private JsonNode healthCheck() {
+<span class="nc bnc" id="L181" title="All 4 branches missed.">        if (githubToken == null || githubToken.isEmpty()) {</span>
+<span class="nc" id="L182">            return createToolResponse(&quot;text&quot;, &quot;❌ GitHub token not configured. Set GITHUB_TOKEN environment variable.&quot;);</span>
+        }
+        
+        try {
+<span class="nc" id="L186">            HttpRequest request = HttpRequest.newBuilder()</span>
+<span class="nc" id="L187">                .uri(URI.create(baseUrl + &quot;/user&quot;))</span>
+<span class="nc" id="L188">                .header(&quot;Authorization&quot;, &quot;Bearer &quot; + githubToken)</span>
+<span class="nc" id="L189">                .header(&quot;Accept&quot;, &quot;application/vnd.github.v3+json&quot;)</span>
+<span class="nc" id="L190">                .GET()</span>
+<span class="nc" id="L191">                .build();</span>
+            
+<span class="nc" id="L193">            HttpResponse&lt;String&gt; response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());</span>
+            
+<span class="nc bnc" id="L195" title="All 2 branches missed.">            if (response.statusCode() == 200) {</span>
+<span class="nc" id="L196">                JsonNode user = mapper.readTree(response.body());</span>
+<span class="nc" id="L197">                return createToolResponse(&quot;text&quot;, &quot;✅ GitHub API connected successfully! User: &quot; + user.get(&quot;login&quot;).asText());</span>
+            } else {
+<span class="nc" id="L199">                return createToolResponse(&quot;text&quot;, &quot;❌ GitHub API authentication failed. Status: &quot; + response.statusCode());</span>
+            }
+<span class="nc" id="L201">        } catch (Exception e) {</span>
+<span class="nc" id="L202">            return createToolResponse(&quot;text&quot;, &quot;❌ GitHub API connection failed: &quot; + e.getMessage());</span>
+        }
+    }
+
+    private JsonNode listWorkflows(String owner, String repo) {
+        try {
+<span class="nc" id="L208">            String url = String.format(&quot;%s/repos/%s/%s/actions/workflows&quot;, baseUrl, owner, repo);</span>
+<span class="nc" id="L209">            JsonNode response = makeGitHubRequest(url);</span>
+            
+<span class="nc" id="L211">            ArrayNode workflows = mapper.createArrayNode();</span>
+<span class="nc bnc" id="L212" title="All 2 branches missed.">            for (JsonNode workflow : response.get(&quot;workflows&quot;)) {</span>
+<span class="nc" id="L213">                ObjectNode wf = mapper.createObjectNode();</span>
+<span class="nc" id="L214">                wf.put(&quot;id&quot;, workflow.get(&quot;id&quot;).asText());</span>
+<span class="nc" id="L215">                wf.put(&quot;name&quot;, workflow.get(&quot;name&quot;).asText());</span>
+<span class="nc" id="L216">                wf.put(&quot;path&quot;, workflow.get(&quot;path&quot;).asText());</span>
+<span class="nc" id="L217">                wf.put(&quot;state&quot;, workflow.get(&quot;state&quot;).asText());</span>
+<span class="nc" id="L218">                workflows.add(wf);</span>
+<span class="nc" id="L219">            }</span>
+            
+<span class="nc" id="L221">            return createToolResponse(&quot;text&quot;, mapper.writeValueAsString(workflows));</span>
+<span class="nc" id="L222">        } catch (Exception e) {</span>
+<span class="nc" id="L223">            return createToolResponse(&quot;text&quot;, &quot;Failed to list workflows: &quot; + e.getMessage());</span>
+        }
+    }
+
+    private JsonNode triggerWorkflow(String owner, String repo, String workflowId, String ref) {
+        try {
+<span class="nc" id="L229">            String url = String.format(&quot;%s/repos/%s/%s/actions/workflows/%s/dispatches&quot;, baseUrl, owner, repo, workflowId);</span>
+            
+<span class="nc" id="L231">            ObjectNode payload = mapper.createObjectNode();</span>
+<span class="nc" id="L232">            payload.put(&quot;ref&quot;, ref);</span>
+            
+<span class="nc" id="L234">            HttpRequest request = HttpRequest.newBuilder()</span>
+<span class="nc" id="L235">                .uri(URI.create(url))</span>
+<span class="nc" id="L236">                .header(&quot;Authorization&quot;, &quot;Bearer &quot; + githubToken)</span>
+<span class="nc" id="L237">                .header(&quot;Accept&quot;, &quot;application/vnd.github.v3+json&quot;)</span>
+<span class="nc" id="L238">                .header(&quot;Content-Type&quot;, &quot;application/json&quot;)</span>
+<span class="nc" id="L239">                .POST(HttpRequest.BodyPublishers.ofString(mapper.writeValueAsString(payload)))</span>
+<span class="nc" id="L240">                .build();</span>
+            
+<span class="nc" id="L242">            HttpResponse&lt;String&gt; response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());</span>
+            
+<span class="nc bnc" id="L244" title="All 2 branches missed.">            if (response.statusCode() == 204) {</span>
+<span class="nc" id="L245">                return createToolResponse(&quot;text&quot;, &quot;✅ Workflow triggered successfully&quot;);</span>
+            } else {
+<span class="nc" id="L247">                return createToolResponse(&quot;text&quot;, &quot;Failed to trigger workflow. Status: &quot; + response.statusCode());</span>
+            }
+<span class="nc" id="L249">        } catch (Exception e) {</span>
+<span class="nc" id="L250">            return createToolResponse(&quot;text&quot;, &quot;Failed to trigger workflow: &quot; + e.getMessage());</span>
+        }
+    }
+
+    private JsonNode getWorkflowRuns(String owner, String repo, String workflowId) {
+        try {
+<span class="nc bnc" id="L256" title="All 2 branches missed.">            String url = workflowId != null </span>
+<span class="nc" id="L257">                ? String.format(&quot;%s/repos/%s/%s/actions/workflows/%s/runs&quot;, baseUrl, owner, repo, workflowId)</span>
+<span class="nc" id="L258">                : String.format(&quot;%s/repos/%s/%s/actions/runs&quot;, baseUrl, owner, repo);</span>
+            
+<span class="nc" id="L260">            JsonNode response = makeGitHubRequest(url);</span>
+            
+<span class="nc" id="L262">            ArrayNode runs = mapper.createArrayNode();</span>
+<span class="nc bnc" id="L263" title="All 2 branches missed.">            for (JsonNode run : response.get(&quot;workflow_runs&quot;)) {</span>
+<span class="nc" id="L264">                ObjectNode runObj = mapper.createObjectNode();</span>
+<span class="nc" id="L265">                runObj.put(&quot;id&quot;, run.get(&quot;id&quot;).asText());</span>
+<span class="nc" id="L266">                runObj.put(&quot;name&quot;, run.get(&quot;name&quot;).asText());</span>
+<span class="nc" id="L267">                runObj.put(&quot;status&quot;, run.get(&quot;status&quot;).asText());</span>
+<span class="nc bnc" id="L268" title="All 2 branches missed.">                runObj.put(&quot;conclusion&quot;, run.has(&quot;conclusion&quot;) ? run.get(&quot;conclusion&quot;).asText() : &quot;&quot;);</span>
+<span class="nc" id="L269">                runObj.put(&quot;created_at&quot;, run.get(&quot;created_at&quot;).asText());</span>
+<span class="nc" id="L270">                runObj.put(&quot;html_url&quot;, run.get(&quot;html_url&quot;).asText());</span>
+<span class="nc" id="L271">                runs.add(runObj);</span>
+<span class="nc" id="L272">            }</span>
+            
+<span class="nc" id="L274">            return createToolResponse(&quot;text&quot;, mapper.writeValueAsString(runs));</span>
+<span class="nc" id="L275">        } catch (Exception e) {</span>
+<span class="nc" id="L276">            return createToolResponse(&quot;text&quot;, &quot;Failed to get workflow runs: &quot; + e.getMessage());</span>
+        }
+    }
+
+    private JsonNode getRunStatus(String owner, String repo, String runId) {
+        try {
+<span class="nc" id="L282">            String url = String.format(&quot;%s/repos/%s/%s/actions/runs/%s&quot;, baseUrl, owner, repo, runId);</span>
+<span class="nc" id="L283">            JsonNode run = makeGitHubRequest(url);</span>
+            
+<span class="nc" id="L285">            ObjectNode status = mapper.createObjectNode();</span>
+<span class="nc" id="L286">            status.put(&quot;id&quot;, run.get(&quot;id&quot;).asText());</span>
+<span class="nc" id="L287">            status.put(&quot;name&quot;, run.get(&quot;name&quot;).asText());</span>
+<span class="nc" id="L288">            status.put(&quot;status&quot;, run.get(&quot;status&quot;).asText());</span>
+<span class="nc bnc" id="L289" title="All 2 branches missed.">            status.put(&quot;conclusion&quot;, run.has(&quot;conclusion&quot;) ? run.get(&quot;conclusion&quot;).asText() : &quot;&quot;);</span>
+<span class="nc" id="L290">            status.put(&quot;created_at&quot;, run.get(&quot;created_at&quot;).asText());</span>
+<span class="nc" id="L291">            status.put(&quot;updated_at&quot;, run.get(&quot;updated_at&quot;).asText());</span>
+<span class="nc" id="L292">            status.put(&quot;html_url&quot;, run.get(&quot;html_url&quot;).asText());</span>
+            
+<span class="nc" id="L294">            return createToolResponse(&quot;text&quot;, mapper.writeValueAsString(status));</span>
+<span class="nc" id="L295">        } catch (Exception e) {</span>
+<span class="nc" id="L296">            return createToolResponse(&quot;text&quot;, &quot;Failed to get run status: &quot; + e.getMessage());</span>
+        }
+    }
+
+    private JsonNode getRunArtifacts(String owner, String repo, String runId) {
+        try {
+<span class="nc" id="L302">            String url = String.format(&quot;%s/repos/%s/%s/actions/runs/%s/artifacts&quot;, baseUrl, owner, repo, runId);</span>
+<span class="nc" id="L303">            JsonNode response = makeGitHubRequest(url);</span>
+            
+<span class="nc" id="L305">            ArrayNode artifacts = mapper.createArrayNode();</span>
+<span class="nc bnc" id="L306" title="All 2 branches missed.">            for (JsonNode artifact : response.get(&quot;artifacts&quot;)) {</span>
+<span class="nc" id="L307">                ObjectNode art = mapper.createObjectNode();</span>
+<span class="nc" id="L308">                art.put(&quot;id&quot;, artifact.get(&quot;id&quot;).asText());</span>
+<span class="nc" id="L309">                art.put(&quot;name&quot;, artifact.get(&quot;name&quot;).asText());</span>
+<span class="nc" id="L310">                art.put(&quot;size_in_bytes&quot;, artifact.get(&quot;size_in_bytes&quot;).asLong());</span>
+<span class="nc" id="L311">                art.put(&quot;created_at&quot;, artifact.get(&quot;created_at&quot;).asText());</span>
+<span class="nc" id="L312">                art.put(&quot;download_url&quot;, artifact.get(&quot;archive_download_url&quot;).asText());</span>
+<span class="nc" id="L313">                artifacts.add(art);</span>
+<span class="nc" id="L314">            }</span>
+            
+<span class="nc" id="L316">            return createToolResponse(&quot;text&quot;, mapper.writeValueAsString(artifacts));</span>
+<span class="nc" id="L317">        } catch (Exception e) {</span>
+<span class="nc" id="L318">            return createToolResponse(&quot;text&quot;, &quot;Failed to get artifacts: &quot; + e.getMessage());</span>
+        }
+    }
+
+    private JsonNode cancelWorkflowRun(String owner, String repo, String runId) {
+        try {
+<span class="nc" id="L324">            String url = String.format(&quot;%s/repos/%s/%s/actions/runs/%s/cancel&quot;, baseUrl, owner, repo, runId);</span>
+            
+<span class="nc" id="L326">            HttpRequest request = HttpRequest.newBuilder()</span>
+<span class="nc" id="L327">                .uri(URI.create(url))</span>
+<span class="nc" id="L328">                .header(&quot;Authorization&quot;, &quot;Bearer &quot; + githubToken)</span>
+<span class="nc" id="L329">                .header(&quot;Accept&quot;, &quot;application/vnd.github.v3+json&quot;)</span>
+<span class="nc" id="L330">                .POST(HttpRequest.BodyPublishers.noBody())</span>
+<span class="nc" id="L331">                .build();</span>
+            
+<span class="nc" id="L333">            HttpResponse&lt;String&gt; response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());</span>
+            
+<span class="nc bnc" id="L335" title="All 2 branches missed.">            if (response.statusCode() == 202) {</span>
+<span class="nc" id="L336">                return createToolResponse(&quot;text&quot;, &quot;✅ Workflow run cancelled successfully&quot;);</span>
+            } else {
+<span class="nc" id="L338">                return createToolResponse(&quot;text&quot;, &quot;Failed to cancel run. Status: &quot; + response.statusCode());</span>
+            }
+<span class="nc" id="L340">        } catch (Exception e) {</span>
+<span class="nc" id="L341">            return createToolResponse(&quot;text&quot;, &quot;Failed to cancel run: &quot; + e.getMessage());</span>
+        }
+    }
+
+    private JsonNode makeGitHubRequest(String url) throws Exception {
+<span class="nc" id="L346">        HttpRequest request = HttpRequest.newBuilder()</span>
+<span class="nc" id="L347">            .uri(URI.create(url))</span>
+<span class="nc" id="L348">            .header(&quot;Authorization&quot;, &quot;Bearer &quot; + githubToken)</span>
+<span class="nc" id="L349">            .header(&quot;Accept&quot;, &quot;application/vnd.github.v3+json&quot;)</span>
+<span class="nc" id="L350">            .GET()</span>
+<span class="nc" id="L351">            .build();</span>
+        
+<span class="nc" id="L353">        HttpResponse&lt;String&gt; response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());</span>
+        
+<span class="nc bnc" id="L355" title="All 2 branches missed.">        if (response.statusCode() != 200) {</span>
+<span class="nc" id="L356">            throw new RuntimeException(&quot;GitHub API error: &quot; + response.statusCode());</span>
+        }
+        
+<span class="nc" id="L359">        return mapper.readTree(response.body());</span>
+    }
+
+    private ObjectNode createTool(String name, String description, ObjectNode... params) {
+<span class="nc" id="L363">        ObjectNode tool = mapper.createObjectNode();</span>
+<span class="nc" id="L364">        tool.put(&quot;name&quot;, name);</span>
+<span class="nc" id="L365">        tool.put(&quot;description&quot;, description);</span>
+        
+<span class="nc" id="L367">        ObjectNode inputSchema = mapper.createObjectNode();</span>
+<span class="nc" id="L368">        inputSchema.put(&quot;type&quot;, &quot;object&quot;);</span>
+        
+<span class="nc" id="L370">        ObjectNode properties = mapper.createObjectNode();</span>
+<span class="nc" id="L371">        ArrayNode required = mapper.createArrayNode();</span>
+        
+<span class="nc bnc" id="L373" title="All 2 branches missed.">        for (ObjectNode param : params) {</span>
+<span class="nc" id="L374">            String paramName = param.get(&quot;name&quot;).asText();</span>
+<span class="nc" id="L375">            properties.set(paramName, param);</span>
+<span class="nc bnc" id="L376" title="All 2 branches missed.">            if (param.get(&quot;required&quot;).asBoolean()) {</span>
+<span class="nc" id="L377">                required.add(paramName);</span>
+            }
+        }
+        
+<span class="nc" id="L381">        inputSchema.set(&quot;properties&quot;, properties);</span>
+<span class="nc" id="L382">        inputSchema.set(&quot;required&quot;, required);</span>
+<span class="nc" id="L383">        tool.set(&quot;inputSchema&quot;, inputSchema);</span>
+        
+<span class="nc" id="L385">        return tool;</span>
+    }
+
+    private ObjectNode createParam(String name, String type, String description, boolean required) {
+<span class="nc" id="L389">        ObjectNode param = mapper.createObjectNode();</span>
+<span class="nc" id="L390">        param.put(&quot;name&quot;, name);</span>
+<span class="nc" id="L391">        param.put(&quot;type&quot;, type);</span>
+<span class="nc" id="L392">        param.put(&quot;description&quot;, description);</span>
+<span class="nc" id="L393">        param.put(&quot;required&quot;, required);</span>
+<span class="nc" id="L394">        return param;</span>
+    }
+
+    private ObjectNode createSuccessResponse(JsonNode id, JsonNode result) {
+<span class="nc" id="L398">        ObjectNode response = mapper.createObjectNode();</span>
+<span class="nc" id="L399">        response.put(&quot;jsonrpc&quot;, &quot;2.0&quot;);</span>
+<span class="nc bnc" id="L400" title="All 4 branches missed.">        if (id != null &amp;&amp; !id.isNull()) {</span>
+<span class="nc" id="L401">            response.set(&quot;id&quot;, id);</span>
+        }
+<span class="nc" id="L403">        response.set(&quot;result&quot;, result);</span>
+<span class="nc" id="L404">        return response;</span>
+    }
+
+    private ObjectNode createErrorResponse(JsonNode id, int code, String message) {
+<span class="nc" id="L408">        ObjectNode response = mapper.createObjectNode();</span>
+<span class="nc" id="L409">        response.put(&quot;jsonrpc&quot;, &quot;2.0&quot;);</span>
+<span class="nc bnc" id="L410" title="All 4 branches missed.">        if (id != null &amp;&amp; !id.isNull()) {</span>
+<span class="nc" id="L411">            response.set(&quot;id&quot;, id);</span>
+        } else {
+<span class="nc" id="L413">            response.putNull(&quot;id&quot;);</span>
+        }
+        
+<span class="nc" id="L416">        ObjectNode error = mapper.createObjectNode();</span>
+<span class="nc" id="L417">        error.put(&quot;code&quot;, code);</span>
+<span class="nc" id="L418">        error.put(&quot;message&quot;, message);</span>
+<span class="nc" id="L419">        response.set(&quot;error&quot;, error);</span>
+        
+<span class="nc" id="L421">        return response;</span>
+    }
+
+    private ObjectNode createToolResponse(String type, String content) {
+<span class="nc" id="L425">        ObjectNode response = mapper.createObjectNode();</span>
+<span class="nc" id="L426">        ArrayNode contentArray = mapper.createArrayNode();</span>
+        
+<span class="nc" id="L428">        ObjectNode contentObj = mapper.createObjectNode();</span>
+<span class="nc" id="L429">        contentObj.put(&quot;type&quot;, type);</span>
+<span class="nc" id="L430">        contentObj.put(&quot;text&quot;, content);</span>
+<span class="nc" id="L431">        contentArray.add(contentObj);</span>
+        
+<span class="nc" id="L433">        response.set(&quot;content&quot;, contentArray);</span>
+<span class="nc" id="L434">        return response;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>
