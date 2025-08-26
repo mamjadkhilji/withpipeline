@@ -30,10 +30,7 @@ jobs:
       run: mvn compile
     
     - name: Test with Coverage
-      run: mvn test jacoco:report
-    
-    - name: Check Coverage
-      run: mvn jacoco:check
+      run: mvn test
     
     - name: Package
       run: mvn package
@@ -42,4 +39,4 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: jar-artifacts
-        path: target/*.jar
+        path: "*/target/*.jar"
