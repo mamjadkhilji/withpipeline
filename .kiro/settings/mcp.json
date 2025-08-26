@@ -1,0 +1,45 @@
+{
+    "mcpServers": {
+        "s3-server": {
+            "command": "mvn",
+            "args": [
+                "exec:java",
+                "-Dexec.mainClass=com.mcp.s3.S3McpServer",
+                "-q"
+            ],
+            "cwd": "/Users/amjad.k.mohammad/MAK/Workspace/KIRO/MCPServers",
+            "env": {
+                "AWS_REGION": "ap-southeast-1",
+                "AWS_ACCESS_KEY_ID": "XXXXXXXXXXXXXXXXXXXX",
+                "AWS_SECRET_ACCESS_KEY": "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" 
+            },
+            "disabled": false,
+            "autoApprove": [
+                "health_check",
+                "list_buckets",
+                "list_objects",
+                "get_object"
+            ]
+        },
+        "cicd-server": {
+            "command": "mvn",
+            "args": [
+                "exec:java",
+                "-Dexec.mainClass=com.mcp.cicd.CicdMcpServer",
+                "-q"
+            ],
+            "cwd": "/Users/amjad.k.mohammad/MAK/Workspace/KIRO/MCPServers",
+            "env": {
+                "GITHUB_TOKEN": "your_github_token_here"
+            },
+            "disabled": false,
+            "autoApprove": [
+                "health_check",
+                "list_workflows",
+                "get_workflow_runs",
+                "get_run_status",
+                "get_run_artifacts"
+            ]
+        }
+    }
+}
