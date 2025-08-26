@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "git-notify": {
+      "command": "java",
+      "args": ["-jar", "git-notify-mcp-1.0.0.jar"],
+      "env": {
+        "GITHUB_TOKEN": "your_token",
+        "GITHUB_REPO": "owner/repo"
+      }
+    }
+  }
+}
