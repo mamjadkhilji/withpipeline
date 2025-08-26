@@ -47,9 +47,11 @@ public class GitNotifyMCPServer extends HttpServlet {
         server.start();
         System.out.println("Git Notify MCP Server started on port 8080");
         
-        // Start polling if no webhook
-        if (github != null && repoName != null) {
+        // Start polling only if token and repo are configured
+        if (github != null && repoName != null && token != null && !token.isEmpty()) {
             startPolling();
+        } else {
+            System.out.println("GitHub polling disabled - no token configured. Webhook-only mode.");
         }
         
         server.join();
