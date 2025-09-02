@@ -126,14 +126,14 @@ public class GitCustomMcpServer {
 
     private JsonNode handleToolCall(JsonNode params) {
         String name = params.get("name").asText();
-        JsonNode arguments = params.get("arguments");
+        JsonNode arguments = params.has("arguments") ? params.get("arguments") : mapper.createObjectNode();
         
         return switch (name) {
             case "git_status" -> gitStatus();
             case "git_log" -> gitLog(arguments.has("limit") ? arguments.get("limit").asInt() : 10);
             case "git_branch" -> gitBranch(arguments.has("branch_name") ? arguments.get("branch_name").asText() : null);
-            case "git_add" -> gitAdd(arguments.get("files").asText());
-            case "git_commit" -> gitCommit(arguments.get("message").asText());
+            case "git_add" -> gitAdd(arguments.has("files") ? arguments.get("files").asText() : ".");
+            case "git_commit" -> gitCommit(arguments.has("message") ? arguments.get("message").asText() : "Auto commit");
             case "git_push" -> gitPush(
                 arguments.has("remote") ? arguments.get("remote").asText() : "origin",
                 arguments.has("branch") ? arguments.get("branch").asText() : null);
