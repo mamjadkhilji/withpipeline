@@ -28,6 +28,7 @@ Collection of Model Context Protocol (MCP) servers for various integrations.
 - **Port**: 8081 (webhook endpoint)
 - **Features**: Complete Git operations, webhook events, pipeline ID extraction
 - **Run**: `cd git-custom-mcp && ./run-server.sh`
+- **Standalone JAR**: `java -jar target/git-custom-mcp-server-1.0.0.jar`
 - **Webhook**: `http://localhost:8081/webhook`
 
 ## Running Servers Standalone
@@ -71,6 +72,9 @@ export GITHUB_REPO=owner/repo
 ```bash
 cd git-custom-mcp
 ./run-server.sh
+# OR run standalone JAR
+mvn package
+java -jar target/git-custom-mcp-server-1.0.0.jar
 # Webhook available at http://localhost:8081/webhook
 ```
 
@@ -114,11 +118,32 @@ cd git-custom-mcp
 2. Add webhook: `http://your-server:8081/webhook`
 3. Select "Push" events
 4. Server will display git status and extract pipeline info
+5. **Test endpoint**: `curl http://your-server:8081/webhook` returns "Welcome to webhook of mcp server"
 
 **For Git Notify Server:**
 1. Add webhook: `http://your-server:8080/webhook`
 2. Select "Workflow runs" events
 3. Server logs notifications to console
+
+## EC2 Deployment
+
+**Security Group Rules:**
+- Port 8080: Git Notify Server
+- Port 8081: Git Custom Server
+- Port 22: SSH Access
+
+**Run on EC2:**
+```bash
+# Upload JAR to EC2
+scp target/git-custom-mcp-server-1.0.0.jar ec2-user@your-ec2:/home/ec2-user/
+
+# Run on EC2
+ssh ec2-user@your-ec2
+nohup java -jar git-custom-mcp-server-1.0.0.jar > server.log 2>&1 &
+
+# Test webhook
+curl http://EC2_PUBLIC_IP:8081/webhook
+```
 
 ## Configuration
 
