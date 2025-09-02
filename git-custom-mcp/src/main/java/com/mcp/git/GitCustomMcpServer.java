@@ -21,6 +21,9 @@ public class GitCustomMcpServer {
     private final ObjectMapper mapper;
     private final String workingDir;
     private HttpServer webhookServer;
+    private String lastProjectId;
+    private String lastPipelineId;
+    private String lastCommitSha;
 
     public GitCustomMcpServer() {
         this.mapper = new ObjectMapper();
@@ -114,6 +117,7 @@ public class GitCustomMcpServer {
             createParam("file", "string", "Specific file to diff", false)));
         tools.add(createTool("get_repo_info", "Get repository information"));
         tools.add(createTool("webhook_status", "Check webhook server status"));
+        tools.add(createTool("get_pipeline_info", "Get latest pipeline information"));
         
         ObjectNode response = mapper.createObjectNode();
         response.set("tools", tools);
@@ -137,6 +141,7 @@ public class GitCustomMcpServer {
             case "git_diff" -> gitDiff(arguments.has("file") ? arguments.get("file").asText() : null);
             case "get_repo_info" -> getRepoInfo();
             case "webhook_status" -> webhookStatus();
+            case "get_pipeline_info" -> getPipelineInfo();
             default -> throw new RuntimeException("Unknown tool: " + name);
         };
     }
@@ -269,6 +274,31 @@ public class GitCustomMcpServer {
         return createToolResponse("text", status);
     }
 
+    private JsonNode getPipelineInfo() {
+        StringBuilder info = new StringBuilder();
+        info.append("🔧 Pipeline Information:\n\n");
+        
+        if (lastProjectId != null) {
+            info.append("📋 Project ID: ").append(lastProjectId).append("\n");
+        } else {
+            info.append("📋 Project ID: Not available\n");
+        }
+        
+        if (lastPipelineId != null) {
+            info.append("🚀 Pipeline ID: ").append(lastPipelineId).append("\n");
+        } else {
+            info.append("🚀 Pipeline ID: Not available\n");
+        }
+        
+        if (lastCommitSha != null) {
+            info.append("📝 Last Commit: ").append(lastCommitSha).append("\n");
+        } else {
+            info.append("📝 Last Commit: Not available\n");
+        }
+        
+        return createToolResponse("text", info.toString());
+    }
+
     private void showGitStatusOnConsole() {
         try {
             String status = executeGitCommand("git", "status", "--porcelain");
@@ -296,10 +326,16 @@ public class GitCustomMcpServer {
                 try {
                     String body = new String(exchange.getRequestBody().readAllBytes());
                     JsonNode payload = mapper.readTree(body);
+                    String event = exchange.getRequestHeaders().getFirst("X-GitHub-Event");
                     
                     System.out.println("\n🔔 Webhook received:");
-                    System.out.println("Event: " + exchange.getRequestHeaders().getFirst("X-GitHub-Event"));
+                    System.out.println("Event: " + event);
                     System.out.println("Repository: " + payload.path("repository").path("full_name").asText());
+                    
+                    // Extract project and pipeline info on push events
+                    if ("push".equals(event)) {
+                        extractPipelineInfo(payload);
+                    }
                     
                     showGitStatusOnConsole();
                     
@@ -317,6 +353,30 @@ public class GitCustomMcpServer {
                 exchange.sendResponseHeaders(405, 0);
                 exchange.getResponseBody().close();
             }
+        }
+    }
+
+    private void extractPipelineInfo(JsonNode payload) {
+        try {
+            // Extract project ID from repository
+            JsonNode repository = payload.path("repository");
+            lastProjectId = repository.path("id").asText();
+            
+            // Extract commit SHA
+            lastCommitSha = payload.path("after").asText();
+            
+            // Generate pipeline ID (could be workflow run ID or custom logic)
+            String repoName = repository.path("full_name").asText();
+            lastPipelineId = "pipeline_" + System.currentTimeMillis();
+            
+            System.out.println("\n🔧 Pipeline Info Extracted:");
+            System.out.println("📋 Project ID: " + lastProjectId);
+            System.out.println("🚀 Pipeline ID: " + lastPipelineId);
+            System.out.println("📝 Commit SHA: " + lastCommitSha);
+            System.out.println("📁 Repository: " + repoName);
+            
+        } catch (Exception e) {
+            System.err.println("Error extracting pipeline info: " + e.getMessage());
         }
     }
 
