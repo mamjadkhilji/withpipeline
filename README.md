@@ -120,6 +120,36 @@ java -jar target/git-custom-mcp-server-1.0.0.jar
 4. Server will display git status and extract pipeline info
 5. **Test endpoint**: `curl http://your-server:8081/webhook` returns "Welcome to webhook of mcp server"
 
+## Webhook Verification
+
+**Check if GitHub webhook is calling your server:**
+
+1. **Server Console Logs:**
+   ```
+   🔔 Webhook received:
+   Event: push
+   Repository: owner/repo
+   ```
+
+2. **GitHub Delivery Logs:**
+   - Go to Repository Settings → Webhooks
+   - Click your webhook → "Recent Deliveries"
+   - Look for ✅ (success) or ❌ (failed)
+
+3. **Test Server Accessibility:**
+   ```bash
+   curl http://your-server:8081/webhook
+   # Should return: "Welcome to webhook of mcp server"
+   ```
+
+4. **Manual Webhook Test:**
+   ```bash
+   curl -X POST http://your-server:8081/webhook \
+     -H "Content-Type: application/json" \
+     -H "X-GitHub-Event: push" \
+     -d '{"repository":{"full_name":"test/repo"}}'
+   ```
+
 **For Git Notify Server:**
 1. Add webhook: `http://your-server:8080/webhook`
 2. Select "Workflow runs" events
@@ -143,6 +173,25 @@ nohup java -jar git-custom-mcp-server-1.0.0.jar > server.log 2>&1 &
 
 # Test webhook
 curl http://EC2_PUBLIC_IP:8081/webhook
+
+# Monitor logs
+tail -f server.log
+```
+
+## Troubleshooting
+
+**Common Issues:**
+- **Git not found**: Install Git or add to PATH
+- **Port blocked**: Check firewall/security groups
+- **Server not accessible**: Verify public IP and port
+- **Webhook fails**: Check GitHub delivery logs
+
+**Windows Git Installation:**
+```bash
+# Download from: https://git-scm.com/download/win
+# Or use package managers:
+choco install git
+winget install Git.Git
 ```
 
 ## Configuration
