@@ -1,37 +1,40 @@
-# Git Notification MCP Server
+# Git Notify MCP Server
 
-Notifies on GitHub workflow run status conclusions.
-
-## Setup
-
-1. Set environment variables:
-```bash
-export GITHUB_TOKEN="your_github_token"
-export GITHUB_REPO="owner/repo"
-```
-
-2. Run server:
-```bash
-./run-server.sh
-```
+GitHub workflow status notification server with webhook listener and polling.
 
 ## Features
 
-- **Webhook listener**: Receives GitHub workflow_run events on port 8080
-- **Polling fallback**: Checks workflow status every 30 seconds
-- **Real-time notifications**: Sends MCP notifications on workflow completion
+- **Webhook Listener**: HTTP server on port 8080 for GitHub webhooks
+- **Workflow Polling**: Checks workflow status every 30 seconds
+- **Real-time Notifications**: Logs workflow status changes
+- **MCP Integration**: Tools for health check and status monitoring
 
-## GitHub Webhook Setup
+## Setup
 
-Add webhook to your repository:
-- URL: `http://your-server:8080/webhook`
-- Events: `Workflow runs`
-- Content type: `application/json`
+1. **Configure Environment:**
+   ```bash
+   export GITHUB_TOKEN=your_github_token
+   export GITHUB_REPO=owner/repo
+   ```
+
+2. **Build and Start:**
+   ```bash
+   mvn compile
+   ./start-server-background.sh
+   ```
+
+3. **Configure GitHub Webhook:**
+   - Go to Repository Settings → Webhooks
+   - Add webhook: `http://your-server:8080/webhook`
+   - Select "Workflow runs" events
+
+## Tools
+
+- `health_check`: Check service status
+- `get_notifications`: View recent notifications
+- `webhook_status`: Check webhook server status
 
 ## Usage
 
-The server automatically notifies when workflows complete with status:
-- `success` - Workflow passed
-- `failure` - Workflow failed  
-- `cancelled` - Workflow cancelled
-- `timed_out` - Workflow timed out
+The server runs in background and logs notifications to `git-notify.log`. 
+Webhook endpoint: `http://localhost:8080/webhook`
