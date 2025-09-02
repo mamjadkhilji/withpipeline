@@ -329,10 +329,12 @@ public class GitCustomMcpServer {
                     String body = new String(exchange.getRequestBody().readAllBytes());
                     JsonNode payload = mapper.readTree(body);
                     String event = exchange.getRequestHeaders().getFirst("X-GitHub-Event");
+                    if (event == null) event = "unknown";
                     
                     System.out.println("\n🔔 Webhook received:");
                     System.out.println("Event: " + event);
-                    System.out.println("Repository: " + payload.path("repository").path("full_name").asText());
+                    String repoName = payload.path("repository").path("full_name").asText("");
+                    System.out.println("Repository: " + (repoName.isEmpty() ? "unknown" : repoName));
                     
                     // Extract project and pipeline info on push events
                     if ("push".equals(event)) {
@@ -389,7 +391,13 @@ public class GitCustomMcpServer {
     }
 
     private String executeGitCommand(String... command) throws Exception {
-        ProcessBuilder pb = new ProcessBuilder(command);
+        // Try to find git executable
+        String gitCmd = findGitExecutable();
+        String[] fullCommand = new String[command.length];
+        fullCommand[0] = gitCmd;
+        System.arraycopy(command, 1, fullCommand, 1, command.length - 1);
+        
+        ProcessBuilder pb = new ProcessBuilder(fullCommand);
         pb.directory(Paths.get(workingDir).toFile());
         Process process = pb.start();
         
@@ -414,6 +422,25 @@ public class GitCustomMcpServer {
         }
         
         return output.toString();
+    }
+
+    private String findGitExecutable() {
+        String os = System.getProperty("os.name").toLowerCase();
+        if (os.contains("win")) {
+            // Try common Windows git paths
+            String[] paths = {
+                "git", "git.exe", 
+                "C:\\Program Files\\Git\\bin\\git.exe",
+                "C:\\Program Files (x86)\\Git\\bin\\git.exe"
+            };
+            for (String path : paths) {
+                try {
+                    new ProcessBuilder(path, "--version").start().waitFor();
+                    return path;
+                } catch (Exception ignored) {}
+            }
+        }
+        return "git"; // Default for Unix/Linux/Mac
     }
 
     private ObjectNode createTool(String name, String description, ObjectNode... params) {
