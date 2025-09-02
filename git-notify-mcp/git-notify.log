@@ -1,0 +1,2 @@
+Error: Could not find or load main class com.mcp.gitnotify.GitNotifyMcpServer
+Caused by: java.lang.ClassNotFoundException: com.mcp.gitnotify.GitNotifyMcpServer

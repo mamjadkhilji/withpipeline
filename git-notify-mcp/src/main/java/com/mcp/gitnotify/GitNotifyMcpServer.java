@@ -167,6 +167,8 @@ public class GitNotifyMcpServer {
         tools.add(createTool("health_check", "Check notification service status"));
         tools.add(createTool("get_notifications", "Get recent workflow notifications"));
         tools.add(createTool("webhook_status", "Check webhook server status"));
+        tools.add(createTool("get_repo_from_push", "Get repository name from git push event", 
+            createParam("git_url", "string", "Git remote URL", true)));
         
         ObjectNode response = mapper.createObjectNode();
         response.set("tools", tools);
@@ -180,6 +182,7 @@ public class GitNotifyMcpServer {
             case "health_check" -> healthCheck();
             case "get_notifications" -> getNotifications();
             case "webhook_status" -> webhookStatus();
+            case "get_repo_from_push" -> getRepoFromPush(params.get("arguments").get("git_url").asText());
             default -> throw new RuntimeException("Unknown tool: " + name);
         };
     }
@@ -216,6 +219,42 @@ public class GitNotifyMcpServer {
             : "❌ Webhook server not running";
         
         return createToolResponse("text", status);
+    }
+
+    private JsonNode getRepoFromPush(String gitUrl) {
+        try {
+            String repoName = extractRepoName(gitUrl);
+            return createToolResponse("text", "📍 Repository: " + repoName);
+        } catch (Exception e) {
+            return createToolResponse("text", "❌ Failed to extract repository name: " + e.getMessage());
+        }
+    }
+
+    private String extractRepoName(String gitUrl) {
+        if (gitUrl == null || gitUrl.isEmpty()) {
+            throw new IllegalArgumentException("Git URL is required");
+        }
+        
+        // Handle different Git URL formats
+        String url = gitUrl.trim();
+        
+        // SSH format: git@github.com:owner/repo.git
+        if (url.startsWith("git@")) {
+            String[] parts = url.split(":");
+            if (parts.length >= 2) {
+                String repoPath = parts[1].replace(".git", "");
+                return repoPath;
+            }
+        }
+        
+        // HTTPS format: https://github.com/owner/repo.git
+        if (url.startsWith("https://")) {
+            String path = url.replace("https://github.com/", "")
+                           .replace(".git", "");
+            return path;
+        }
+        
+        throw new IllegalArgumentException("Unsupported Git URL format: " + gitUrl);
     }
 
     private void shutdown() {
@@ -260,18 +299,39 @@ public class GitNotifyMcpServer {
         }
     }
 
-    private ObjectNode createTool(String name, String description) {
+    private ObjectNode createTool(String name, String description, ObjectNode... params) {
         ObjectNode tool = mapper.createObjectNode();
         tool.put("name", name);
         tool.put("description", description);
         
         ObjectNode inputSchema = mapper.createObjectNode();
         inputSchema.put("type", "object");
-        inputSchema.set("properties", mapper.createObjectNode());
-        inputSchema.set("required", mapper.createArrayNode());
+        
+        ObjectNode properties = mapper.createObjectNode();
+        ArrayNode required = mapper.createArrayNode();
+        
+        for (ObjectNode param : params) {
+            String paramName = param.get("name").asText();
+            properties.set(paramName, param);
+            if (param.get("required").asBoolean()) {
+                required.add(paramName);
+            }
+        }
+        
+        inputSchema.set("properties", properties);
+        inputSchema.set("required", required);
         tool.set("inputSchema", inputSchema);
         
         return tool;
+    }
+
+    private ObjectNode createParam(String name, String type, String description, boolean required) {
+        ObjectNode param = mapper.createObjectNode();
+        param.put("name", name);
+        param.put("type", type);
+        param.put("description", description);
+        param.put("required", required);
+        return param;
     }
 
     private ObjectNode createSuccessResponse(JsonNode id, JsonNode result) {
