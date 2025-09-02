@@ -322,7 +322,9 @@ public class GitCustomMcpServer {
     private class WebhookHandler implements HttpHandler {
         @Override
         public void handle(HttpExchange exchange) throws IOException {
-            if ("POST".equals(exchange.getRequestMethod())) {
+            String method = exchange.getRequestMethod();
+            
+            if ("POST".equals(method)) {
                 try {
                     String body = new String(exchange.getRequestBody().readAllBytes());
                     JsonNode payload = mapper.readTree(body);
@@ -349,6 +351,12 @@ public class GitCustomMcpServer {
                     exchange.sendResponseHeaders(500, 0);
                     exchange.getResponseBody().close();
                 }
+            } else if ("GET".equals(method)) {
+                String welcomeMessage = "Welcome to webhook of mcp server";
+                exchange.sendResponseHeaders(200, welcomeMessage.length());
+                OutputStream os = exchange.getResponseBody();
+                os.write(welcomeMessage.getBytes());
+                os.close();
             } else {
                 exchange.sendResponseHeaders(405, 0);
                 exchange.getResponseBody().close();

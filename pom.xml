@@ -28,7 +28,7 @@
     <modules>
         <module>s3-mcp</module>
         <module>ci-cd-mcp</module>
-        <module>git-notify-mcp</module>
+        <!--module>git-notify-mcp</module-->
         <module>git-custom-mcp</module>
     </modules>
     
