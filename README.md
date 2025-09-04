@@ -67,7 +67,7 @@ export GITHUB_TOKEN=your_token
 export GITHUB_REPO=owner/repo
 ./start-server-background.sh
 ```
-
+for testing purpose.
 **Git Custom Server:**
 ```bash
 cd git-custom-mcp
